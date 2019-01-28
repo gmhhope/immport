@@ -5,13 +5,34 @@ output: html_notebook
 
 This is the R code that is equivalent to Shuzhao's Python code. This will process an fcs file in particular
 though it needs to be generlized to process other fcs files contained in the IMMPORT studies of interest. There are
-other data types that need to be converted also. This is just to get the ball rolling. Some of the fcs files in other studies appear to have a different number of  columns with different names hence some arugments to this code might be required to isolate the right information. The general idea is to get each time point for a unique Participant id and make a new column
-that is a combination of the Participating id and the time point. In the end, we then summarize the **Population Cell Number**
-in terms of the **observation_ID** and the **Population Name Reported**. This can easily be done with the **group_by** and **gather** functions to create the desired output table. Much of the following code is just to outline the approach. 
+other data types that need to be converted also. This is just to get the ball rolling. Some of the fcs files in other studies appear to have a different number of  columns with different names hence some arugments to this code might be required to isolate the right column information. The general idea is to get each time point for a unique Participant id and make a new column that is a combination of the Participating id and the time point. In the end, we then summarize the **Population Cell Number** in terms of the **observation_ID** and the **Population Name Reported**. This can easily be done with the **group_by** and **gather** functions to create the desired output table. Much of the following code is just to outline the approach. 
 
 INPUTS: An fcs file from one of the IMMPORT studies
 
 OUTPUTS: 1) a data matrix for subsequent processing and 2) An annotation file tha. 
+
+The output of a data matrix has the following format wherein the first column is each of the unique population 
+identifiers found in the data. The rows are the the observation_ID combined with the time point for each participant_ID.
+These are found in the input fcs file. 
+
+
+```{r eval=FALSE}
+data.matrix[1:4,1:5]
+
+# A tibble: 4 x 5
+# Groups:   Population Definition Reported [4]
+  `Population Definition Reported` `SUB114450_-7.0` SUB114450_0.0 SUB114450_1.0 SUB114450_7.0 .. ..
+  <chr>                                       <dbl>         <dbl>         <dbl>         <dbl>
+1 CD45+CD14+                                  23.8          19.1          19.7          21.1 
+2 CD45+CD14+CD40+                              2.4           2.92          3.71          2.76
+3 CD45+CD14+CD83+                              0.99          2.33          1.67          0.8 
+4 CD45+CD14+CD86+                              3.15          3.68          5.78          2.54
+..
+..
+```
+
+
+Load up some libraries
 
 ```{r}
 # Load some libraries we'll need
@@ -19,7 +40,7 @@ library(dplyr)
 library(readr)
 ```
 
-I made this file public on the Google storage. All other files are currently private.
+I made this file public on the Google storage. Check the [project Wiki](https://github.com/steviep42/immport/wiki/Using-Google-SDK-To-Manage-Storage) for examples on how to copy down folders and files from the project in general. All other files are currently private.
 
 ```{r}
 name <- "https://storage.googleapis.com/immport/Shuzhao_example_SDY80/datasrc/fcs_analyzed_result_2018-04-02_07-02-30.tsv"
@@ -49,7 +70,7 @@ length(unique(fcs$`Participant ID`))
 ```
 
 
-Okay, let's extract the portion of the Participant id before the "." character. I don't know if these ids are always of the same length so I take a more general approach. If they will be of the same length then this code could be much simpler. The idea is to create an observation ID that is also a function of the time point. We will be creating an new column called "observation_ID"
+Okay, let's extract the portion of the Participant id before the "." character. I don't know if these ids are always of the same length so I take a more general approach. If they will be of the same length then this code could be much simpler. The idea is to create an observation ID that is also a function of the time point. We will be creating an new column called "observation_ID".  
 
 ```{r}
 ids <- sapply(strsplit(fcs$`Participant ID`,"\\."),`[`,1)
