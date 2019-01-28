@@ -1,0 +1,100 @@
+---
+title: "FCS Processor"
+output: html_notebook
+---
+
+This is the R code that is equivalent to Shuzhao's Python code. This will process an fcs file in particular
+though it needs to be generlized to process other fcs files contained in the IMMPORT studies of interest. There are
+other data types that need to be converted also. This is just to get the ball rolling. Some of the fcs files in other studies appear to have a different number of  columns with different names hence some arugments to this code might be required to isolate the right information. The general idea is to get each time point for a unique Participant id and make a new column
+that is a combination of the Participating id and the time point. In the end, we then summarize the **Population Cell Number**
+in terms of the **observation_ID** and the **Population Name Reported**. This can easily be done with the **group_by** and **gather** functions to create the desired output table. Much of the following code is just to outline the approach. 
+
+INPUTS: An fcs file from one of the IMMPORT studies
+
+OUTPUTS: 1) a data matrix for subsequent processing and 2) An annotation file tha. 
+
+```{r}
+# Load some libraries we'll need
+library(dplyr)
+library(readr)
+```
+
+I made this file public on the Google storage. All other files are currently private.
+
+```{r}
+name <- "https://storage.googleapis.com/immport/Shuzhao_example_SDY80/datasrc/fcs_analyzed_result_2018-04-02_07-02-30.tsv"
+
+fcs80 <- read_tsv(name)
+
+names(fcs)
+```
+
+Here we inspect the data. It's not needed as part of the conversions but I wanted to use this to make sure 
+I was getting comparable results to Shuzhao's code
+
+```{r}
+# how many populations ?
+populations <- fcs$`Population Definition Reported`
+length(unique(fcs$`Population Definition Reported`))
+
+# Get the count of each population - the first 8 anyway
+table(fcs$`Population Definition Reported`)[1:8]
+
+# Get unique Study times
+length(unique(fcs$`Study Time Collected`))
+
+# Get unique subject / participant ids
+length(unique(fcs$`Participant ID`))
+
+```
+
+
+Okay, let's extract the portion of the Participant id before the "." character. I don't know if these ids are always of the same length so I take a more general approach. If they will be of the same length then this code could be much simpler. The idea is to create an observation ID that is also a function of the time point. We will be creating an new column called "observation_ID"
+
+```{r}
+ids <- sapply(strsplit(fcs$`Participant ID`,"\\."),`[`,1)
+observation_ID <- gsub(" ","",paste(ids,format(fcs$`Study Time Collected`,nsmall=1),sep="_"))
+
+# All we need is the first 10 columns from the data frame
+
+fcs.mat <- cbind(observation_ID,fcs[,1:10])
+fcs.mat$observation_ID <- as.character(fcs.mat$observation_ID)
+fcs.mat$`Participant ID` <- ids 
+
+```
+
+Okay, create the data matrix. This is easy - group by combinations of Population and Observation id 
+and then taking the median of the Population Cell Number. This gives us a table that we can then
+"spread" back out to get the Population in the first column with observation_IDS as columns with 
+the "medianized" Population Cell Numbers. 
+
+```{r}
+data.matrix <- fcs.mat %>% 
+  group_by(`Population Definition Reported`,observation_ID) %>%
+  summarize(med=median(`Population Cell Number`)) %>% 
+  spread(observation_ID,med) 
+
+write_tsv(data.matrix,"fcs_annotation.tsv")
+
+```
+
+Next create the Annotation file. We limit the number of columns we need here. We then remove any duplicates since this is
+simply an annotation file. No data summarization is required for this step. 
+
+```{r}
+fcs.tmp <- cbind(observation_ID,fcs[,1:8])
+fcs.tmp$observation_ID <- as.character(fcs.tmp$observation_ID)
+fcs.tmp$`Participant ID` <- ids 
+
+fcs.2 <- fcs.tmp[,1:8]
+# Are there duplicates ?
+sum(duplicated(fcs.2))
+
+# Get rid of duplicated rows (except the first occurrence thereof)
+fcs.3 <- fcs.2[!duplicated(fcs.2),]
+
+# 
+write_tsv(fcs.3[,1:7],"fcs_data_matrix.txt")
+
+```
+
