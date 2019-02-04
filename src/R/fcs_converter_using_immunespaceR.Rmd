@@ -1,0 +1,121 @@
+---
+title: "fcs processor"
+output: html_notebook
+---
+
+Okay, I now remember where the fcs files to process can come from. The R code at https://github.com/steviep42/immport/blob/master/src/R/fcs_converter.Rmd refers to the
+file on the Google Storage that Shuzhao created  - https://storage.googleapis.com/immport/Shuzhao_example_SDY80/datasrc/fcs_analyzed_result_2018-04-02_07-02-30.tsv 
+
+As I mentioned, I could not find this type of file in the SDY80 example folder or any of the other folders. But, it turns out that the file came from ImmuneSpace which also has a companion R package called ImmuneSpaceR - Look at the Wiki for details on how to install that and get it working: https://github.com/steviep42/immport/wiki/Working-with-ImmuneSpaceR  So, given some study names: SDY180, SDY212, SDY269, SDY311, SDY312, SDY314 one should be able to use ImmuneSpaceR to fetch the associated fcs_analyzed_result  file. 
+
+So what needs to be done next ? This code should be modified to also fetch the neut_ab_titer data. It will
+require slightly different processing which Shuzhao has outline at
+https://00e9e64bace0b2982e6c7f751d8657c2aed2bdb08bccd8e8d7-apidata.googleusercontent.com/download/storage/v1/b/immport/o/Shuzhao_example_SDY80%2FREADME.txt?qk=AD5uMEselPpKaSxfnqrsMpx9zHIZ34MwSTNZ9dM_M3M5r9ZVOTsmAnClN7MJcnU4KCESa_lnM_6_bddfow-EaotiLsuQONBBPRc3Yhmwokmp1buhDHnRo2AFKB29Rwff-jxacs-wbGvhimNQVUsmN_gHc3hoN44kHwB59g1LWqCtz6WxrzyuAQcctx0TyLXh6aaG0xJq_c-yDJYHJavlUNpglm-i_6qle5Lob8CWB9x4614TDD8lovqC8ZI1SwvB4-_9R8Q7IstFUpFo88lRmJgKY2-ah8_gLDFaeaRMtBfA3Qx8trU46Rt7IIbHA--AxM-7zfmk-Ev_DLn3G0e1Oz4d6_SHNbnWMmLNtfbBQek2mza9QQJSLRngwrhX56q0pTbw6iQLr_RZ-6l4swPUoXucfGF-Teylv1ZkD9wU09ZYOutnf4NXiyzU7o6LnR64uuM_aXY1bAXs4Zw791rpgO3TwubM-2q9i3ZYhBro_ZoVw053ZZu29b89OPiwMgqkpH4zC0kMVqKsegusONxrCiwXG8iPX0iS-HTTLSFffmlDdgGslb80BP9Nv_UMZtShXugmrdyPw17__jcc_gECgsirCDRpu5RqywcyMxOjcSS896NEnHlUr7vLv3b6fFZ_76q5Ph9iklaOLdq4ddRc1gEI3pHP3D_z2rtioz4hei0XEghyZE-PElCEy_B_OQ-wmFNNofQYD3Oh9EkFDlDAuNkq-xpJHNsH4Pqm-jRpPZzb-A-BQh9EnXF-JhEJy7FR-QyV-h3cT-_Q52DAlegsXsNSLdpHwRz-PA
+
+
+
+
+
+```{r}
+library(ImmuneSpaceR)
+```
+
+Here are some studies from which we want to extract the fcs_analyzed_result information. Note that not every study will have this information so the code should ideally check for NULL responses. This just populates the list / dictionary with the data. 
+
+```{r}
+path <- "~/Downloads/"
+# names <- c("SDY80","SDY180","SDY269","SDY312")
+names <- c("SDY80","SDY180","SDY212","SDY269","SDY312")
+flist <- list()
+
+for (ii in 1:length(names)) {
+  tmp <- CreateConnection(names[ii])
+  flist[[ii]] <- tmp$getDataset("fcs_analyzed_result")
+}
+```
+
+Now, we can write out the files. We could do it as part of the above loop but I separate it here in case the connectivity to the ImmuneSpaceR site is slow
+
+```{r}
+mainDir <- "~/Downloads"
+subDir <- "out"
+
+dir.create(file.path(mainDir, subDir))
+setwd(file.path(mainDir, subDir))
+
+for (ii in 1:length(flist)) {
+ # Write out the files
+  
+  outname <- paste(names[ii],"fcs_analyzed_result.tsv",sep="_")
+#  fullpath <- paste0(path,outname,sep="")
+  if (nrow(flist[[ii]]) == 0) {
+    str <- paste(outname,"does not have any rows to write",sep=" ")
+    print(str)
+  } else {
+     write_tsv(flist[[ii]],path=outname)
+  }
+}
+```
+
+This will write out the data matrix files which summarize the population_cell_number in terms of the observation_ID and population_definition_reported.
+
+```{r}
+setwd(file.path(mainDir, subDir))
+files <- list.files(pattern="*fcs_analyzed*")
+#
+for (ii in 1:length(files)) {
+  fcs <- read_tsv(files[ii])
+  ids <- sapply(strsplit(fcs$`participant_id`,"\\."),`[`,1)
+  observation_ID <- gsub(" ","",paste(ids,format(fcs$`study_time_collected`,nsmall=1),sep="_"))
+   
+# All we need is the first 10 columns from the data frame
+   
+   fcs.mat <- cbind(observation_ID,fcs[,1:10])
+   fcs.mat$observation_ID <- as.character(fcs.mat$observation_ID)
+   fcs.mat$`Participant ID` <- ids 
+   data.matrix <- fcs.mat %>% 
+     group_by(`population_definition_reported`,observation_ID) %>%
+     summarize(med=median(`population_cell_number`)) %>% 
+     spread(observation_ID,med) 
+   
+    fname <- paste(strsplit(files[ii],"_")[[1]][1],"fcs_data_matrix.tsv",sep="_")
+    write_tsv(data.matrix,fname)
+}
+```
+
+Next create the Annotation file. We limit the number of columns we need here. We then remove any duplicates since this is simply an annotation file. No data summarization is required for this step. 
+
+```{r}
+setwd(file.path(mainDir, subDir))
+files <- list.files(pattern="*fcs_analyzed*")
+#
+for (ii in 1:length(files)) {
+  fcs <- read_tsv(files[ii])
+  ids <- sapply(strsplit(fcs$`participant_id`,"\\."),`[`,1)
+  observation_ID <- gsub(" ","",paste(ids,format(fcs$`study_time_collected`,nsmall=1),sep="_"))
+   
+# All we need is the first 10 columns from the data frame
+   
+   fcs.mat <- cbind(observation_ID,fcs[,1:10])
+   fcs.mat$observation_ID <- as.character(fcs.mat$observation_ID)
+   fcs.mat$`Participant ID` <- ids 
+   
+   
+   fcs.tmp <- cbind(observation_ID,fcs[,1:8])
+   fcs.tmp$observation_ID <- as.character(fcs.tmp$observation_ID)
+   fcs.tmp$`Participant ID` <- ids 
+
+      fcs.2 <- fcs.tmp[,1:8]
+      
+# Are there duplicates ?
+      sum(duplicated(fcs.2))
+
+# Get rid of duplicated rows (except the first occurrence thereof)
+    fcs.3 <- fcs.2[!duplicated(fcs.2),]
+   
+    fname <- paste(strsplit(files[ii],"_")[[1]][1],"fcs_annotation.tsv",sep="_")
+    write_tsv(fcs.3,fname)
+}
+```
+
+
