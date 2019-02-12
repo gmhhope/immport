@@ -57,11 +57,27 @@ antibody_fetch <- function(study="SDY80",type="neut_ab_titer") {
     # Notice that this specific to the study and data type and would need to be adjusted so
     # this code will fail for example if you tried to access SDY180 hai data
     
+  #  virus.tmp <- fct_collapse(df.2$virus,
+  #                            Brisbane_A=c("A/Brisbane/59/2007"),
+  #                            California=c("A/California/7/2009","A_Ca_07_swine"),
+  #                            Uruguay=c("A/Uruguay/716/2007","A_Uruguay_716_2007"),
+  #                            Brisbane_B=c("B/Brisbane/60/2008","B_Brisbane_60_2001"))
+  #
+    
     virus.tmp <- fct_collapse(df.2$virus,
-                              Brisbane_A=c("A/Brisbane/59/2007"),
+                              Brisbane_A=c("A/Brisbane/59/2007","A/Brisbane/10/2007"),
                               California=c("A/California/7/2009","A_Ca_07_swine"),
                               Uruguay=c("A/Uruguay/716/2007","A_Uruguay_716_2007"),
-                              Brisbane_B=c("B/Brisbane/60/2008","B_Brisbane_60_2001"))
+                              Brisbane_B=c("B/Brisbane/60/2008","B_Brisbane_60_2001","B/Brisbane/03/2007"),
+                              Perth=c("A/Perth/16/2009","A/Perth/19/09 H3N2"),
+                              Wisconsin=c("B/Wisconsin/01/2010"),
+                              Victoria=c("A/Victoria/361/2011","A/Victoria/3/1975"),
+                              Massachusetts="B/Massachusetts/02/2012",
+                              Florida="B/Florida/4/2006",
+                              South_Dakota="A/South Dakota/06/2007",
+                              Lee="B/Lee/1940",
+                              Influenza_A_HIN1=c("A/PR/8/34 (H1N1)","influenza A H1N1"),
+                              Influenza_B="influenza B")
     
     # Create a new column at the end of the data frame with the newly collpsed normalized virus names
     
@@ -81,3 +97,5 @@ antibody_fetch <- function(study="SDY80",type="neut_ab_titer") {
     write_tsv(out,matrix.out)
     return(out)
 }
+
+
