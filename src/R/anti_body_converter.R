@@ -105,18 +105,27 @@ antibody_fetch <- function(study="SDY80",type="neut_ab_titer") {
                                   Influenza_B="influenza B")
         
         # Create a new column at the end of the data frame with the newly collpsed normalized virus names
-        
-        df.2$neut_ab_titer <- virus.tmp
-        
         # Now we want to create a table of the virus names by the observation ideas and then sum the 
         # value_preferred column
         
-        df.2 %>% group_by(neut_ab_titer,observation_id) %>% summarize(sum=sum(value_preferred))
+        if (type == "neut_ab_titer") {
+          df.2$neut_ab_titer <- virus.tmp
+          df.2 %>% group_by(neut_ab_titer,observation_id) %>% summarize(sum=sum(value_preferred))
+          
+          out <- df.2 %>% group_by(neut_ab_titer,observation_id) %>% 
+            summarize(sum=sum(value_preferred)) %>% 
+            spread(observation_id,sum)
+          
+        } else {
+          df.2$hai <- virus.tmp
+          df.2 %>% group_by(hai,observation_id) %>% summarize(sum=sum(value_preferred))
+          
+          out <- df.2 %>% group_by(hai,observation_id) %>% 
+            summarize(sum=sum(value_preferred)) %>% 
+            spread(observation_id,sum)
+          
+        }
         
-        out <- df.2 %>% group_by(neut_ab_titer,observation_id) %>% 
-          summarize(sum=sum(value_preferred)) %>% 
-          spread(observation_id,sum)
-      
         matrix.out <- paste(study,type,sep="_")
         matrix.out <- paste(matrix.out,"data_matrix.txt",sep="_")
         write_tsv(out,matrix.out)
