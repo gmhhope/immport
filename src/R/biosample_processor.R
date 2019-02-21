@@ -27,13 +27,16 @@ get_biosample <- function(studies="SDY80",output_folder="~/Downloads") {
     # dbplyr does lazy connections so it doesn't actually fetch the data at first
     
     biosample <- tbl(con,"biosample")
+    
+    output <- biosample %>% filter(study_accession == studies[ii])
+    
     fname <- paste(studies[ii],"biosample.txt",sep="_")
     fname <- paste(output_folder,fname,sep="/")
     
     # Because dbplyr does lazy evaluation we have to use the collection 
     # function to force it to pull the data out of the data base
     
-    write_tsv(collect(biosample),fname)
+    write_tsv(collect(output),fname)
     msg <- paste0("Processed ",studies[ii]," to filename: ",fname)
     print(msg)
   }
